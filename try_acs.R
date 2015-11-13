@@ -21,32 +21,94 @@ class(us_counties)
 # [1] "sp"
 
 # create a new version
-df.polygon2<-us_counties #us_counties is the tract or county shapes
+#     df.polygon2<-us_counties #us_counties is the tract or county shapes
 
-# create a rec-field to make sure that we have the order correct
-# this probably is unnecessary but it helps to be careful
-df.polygon2@data$rec<-1:nrow(df.polygon2@data)
-tmp <- left_join(df.polygon2@data, data, by=c("GEOID"="id")) %>% 
-    arrange(rec)
+#     # create a rec-field to make sure that we have the order correct
+#     # this probably is unnecessary but it helps to be careful
+#     df.polygon2@data$rec<-1:nrow(df.polygon2@data)
+#     tmp <- left_join(df.polygon2@data, data, by=c("GEOID"="id")) %>% 
+#         arrange(rec)
+#     
+#     # replace the original data with the new merged data
+#     df.polygon2@data<-tmp
+#     # limit to NYC
+#     df.polygon2 <- df.polygon2[grep("Nebraska|Kansas|Iowa|Missouri", df.polygon2$geography),]
+#     #df.polygon2 <- df.polygon2[order(df.polygon2$percent),]
 
-# replace the original data with the new merged data
-df.polygon2@data<-tmp
-# limit to NYC
-df.polygon2 <- df.polygon2[grep("Nebraska|Kansas|Iowa|Missouri", df.polygon2$geography),]
-#df.polygon2 <- df.polygon2[order(df.polygon2$percent),]
-
+## 
+## 1) Set up the packages
+##
 
 library(tigris)
 library(acs)
 library(stringr) # to pad fips codes
 
-# make geo of all the counties in the four states
-NeKsIaMo_counties <- geo.make(state=c('NE','KS','IA','MO'), county = '*', check = T)
+## 
+## 2) Get the spatial data (tigris)
+##
+counties_shapes <- counties(state=c('NE','KS','IA','MO'), cb=TRUE)
 
+##
+## 3) Get the tabular data (acs) 
+##     
+## make geo of all the counties in the four states
+NeKsIaMo_counties <- geo.make(state=c('NE','KS','IA','MO'), county = '*', check = TRUE)
 # make geo of the 15 counties in the Service Area
 
 # get total population:
-total_pop <- acs.fetch(geo=NeKsIaMo_counties, table.number="B01003", endyear = 2013, span = 5, dataset = 'acs')
+total_pop <- acs.fetch(geo=NeKsIaMo_counties, 
+                       table.number="B01003", col.names = "pretty", 
+                       endyear = 2013, span = 5, dataset = 'acs')
+attr(total_pop, "acs.colnames")
+
+# convert to a data.frame for merging
+total_pop_df <- data.frame(paste0(str_pad(total_pop@geography$state, 2, "left", pad="0"), 
+                                  str_pad(total_pop@geography$county, 3, "left", pad="0")),
+                           total_pop@estimate[,"Total Population:  Total "], 
+                           stringsAsFactors = FALSE)
+
+total_pop_df <- select(total_pop_df, 1:2)
+rownames(total_pop_df)<-1:nrow(total_pop_df)
+names(total_pop_df)<-c("GEOID", "total")
+total_pop_df$percent <- 100 #*(total_pop_df$over_200/total_pop_df$total) # WRONG
+    # more appropriate division (proportion) calculation:
+    #apply(enrl_level_p[,7:8], MARGIN = 1, FUN = divide.acs, 
+    #      denominator = enrl_level_p[,1], method = "proportion", verbose=F)
+
+
+## 
+## 4) Do the merge (tigris)
+## 
+total_pop_merged<- geo_join(counties_shapes, total_pop_df, "GEOID", "GEOID")
+# there are some tracts with no land that we should exclude
+total_pop_merged <- total_pop_merged[total_pop_merged$ALAND>0,]
+
+## 
+## 5) Make your map (leaflet)
+##
+popup <- paste0("GEOID: ", total_pop_merged$GEOID, "<br>", "Population: ", total_pop_merged$total)
+pal <- colorNumeric(
+    palette = "YlGnBu",
+    domain = total_pop_merged$total
+)
+
+map1<-leaflet() %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    addPolygons(data = total_pop_merged, 
+                fillColor = ~pal(total), 
+                color = "#b2aeae", # you need to use hex colors
+                fillOpacity = 0.7, 
+                weight = 1, 
+                smoothFactor = 0.2,
+                popup = popup) %>%
+    addLegend(pal = pal, 
+              values = total_pop_merged$total, 
+              position = "bottomright", 
+              title = "Total Population",
+              labFormat = labelFormat(big.mark = ",")) 
+map1
+#####################################################
+
 
 # get B14001: School Enrollment by Level of School
 enrl_level <- acs.fetch(geo=NeKsIaMo_counties, table.number="B14001", endyear = 2013, span = 5, dataset = 'acs')
