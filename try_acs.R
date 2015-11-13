@@ -1,39 +1,18 @@
 ###### Based on http://zevross.com/blog/2015/10/14/manipulating-and-mapping-us-census-data-in-r-using-the-acs-tigris-and-leaflet-packages-3/
 ######
-library(leaflet)  # for interactive maps (NOT leafletR here)
-library(sp)       # for spatial objects
-library(rgdal)    # for readOGR and others
-library(dplyr)    # for working with data frames
+#library(leaflet)  # for interactive maps (NOT leafletR here)
+#library(sp)       # for spatial objects
+#library(rgdal)    # for readOGR and others
+#library(dplyr)    # for working with data frames
 
-us_counties <- readOGR(dsn="shapefiles", layer = "cb_2014_us_county_500k")
-# OGR data source with driver: ESRI Shapefile 
-# Source: "shapefiles", layer: "cb_2014_us_county_500k"
-# with 3233 features
-# It has 9 fields
+#us_counties <- readOGR(dsn="shapefiles", layer = "cb_2014_us_county_500k")
 
 # convert the GEOID to a character
-us_counties@data$GEOID<-as.character(us_counties@data$GEOID)
+#us_counties@data$GEOID<-as.character(us_counties@data$GEOID)
 
 # Make use of the existing SpatialPolygonsDataFrame
-class(us_counties)
-# [1] "SpatialPolygonsDataFrame"
-# attr(,"package")
-# [1] "sp"
+#class(us_counties)
 
-# create a new version
-#     df.polygon2<-us_counties #us_counties is the tract or county shapes
-
-#     # create a rec-field to make sure that we have the order correct
-#     # this probably is unnecessary but it helps to be careful
-#     df.polygon2@data$rec<-1:nrow(df.polygon2@data)
-#     tmp <- left_join(df.polygon2@data, data, by=c("GEOID"="id")) %>% 
-#         arrange(rec)
-#     
-#     # replace the original data with the new merged data
-#     df.polygon2@data<-tmp
-#     # limit to NYC
-#     df.polygon2 <- df.polygon2[grep("Nebraska|Kansas|Iowa|Missouri", df.polygon2$geography),]
-#     #df.polygon2 <- df.polygon2[order(df.polygon2$percent),]
 
 ## 
 ## 1) Set up the packages
@@ -42,6 +21,8 @@ class(us_counties)
 library(tigris)
 library(acs)
 library(stringr) # to pad fips codes
+library(leaflet)  # for interactive maps (NOT leafletR here)
+library(dplyr)    # for working with data frames
 
 ## 
 ## 2) Get the spatial data (tigris)
@@ -86,7 +67,7 @@ total_pop_merged <- total_pop_merged[total_pop_merged$ALAND>0,]
 ## 
 ## 5) Make your map (leaflet)
 ##
-popup <- paste0("GEOID: ", total_pop_merged$GEOID, "<br>", "Population: ", total_pop_merged$total)
+popup <- paste0("County: ", total_pop_merged$NAME, "<br>", "Population: ", total_pop_merged$total)
 pal <- colorNumeric(
     palette = "YlGnBu",
     domain = total_pop_merged$total
@@ -111,7 +92,9 @@ map1
 
 
 # get B14001: School Enrollment by Level of School
-enrl_level <- acs.fetch(geo=NeKsIaMo_counties, table.number="B14001", endyear = 2013, span = 5, dataset = 'acs')
+enrl_level <- acs.fetch(geo=NeKsIaMo_counties, 
+                        table.number="B14001", 
+                        endyear = 2013, span = 5, dataset = 'acs')
 
 col.names = make.names( c("Total", 
               "All Enrolled", 
