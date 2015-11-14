@@ -1,92 +1,62 @@
 ###### Based on http://zevross.com/blog/2015/10/14/manipulating-and-mapping-us-census-data-in-r-using-the-acs-tigris-and-leaflet-packages-3/
 ######
 
-## 
-## 1) Set up the packages
-##
-
+##################################################
+##                                              ## 
+## 1) Set up the packages                       ##
+##                                              ##
+##################################################
 library(tigris)
 library(acs)
 library(stringr) # to pad fips codes
 library(leaflet)  # for interactive maps (NOT leafletR here)
 library(dplyr)    # for working with data frames
 
-## 
-## 2) Get the spatial data (tigris)
-##
+##################################################
+##                                              ## 
+## 2) Get the spatial data (tigris)             ##
+##                                              ##
+##################################################
+
 counties_shapes <- counties(state=c('NE','KS','IA','MO'), cb=TRUE)
 ## make geo of all the counties in the four states (for acs query)
 NeKsIaMo_counties <- geo.make(state=c('NE','KS','IA','MO'), county = '*', check = TRUE)
 
-##
-## 3) Get the tabular data (acs) 
-##     
-# make geo of the 15 counties in the Service Area
+##################################################
+##                                              ## 
+## 3) Query the ACS and build the tabular data  ##
+##                                              ##
+##################################################
+# todo: make geo of the 15 counties in the Service Area
 
-# get total population:
+# Query B01003: "Total Population"
+# --------------------------------
+# tl = acs.lookup(table.name = "B01003")
+# cbind(tl@results$variable.code, 
+#       tl@results$variable.name)
+#   [1,] "B01003_001" " Total "
+
 total_pop <- acs.fetch(geo=NeKsIaMo_counties, 
-                       table.number="B01003", col.names = "pretty", 
+                       table.number="B01003", col.names = "Total.Population", 
                        endyear = 2013, span = 5, dataset = 'acs')
-attr(total_pop, "acs.colnames")
-
-# convert to a data.frame for merging
-total_pop_df <- data.frame(paste0(str_pad(total_pop@geography$state, 2, "left", pad="0"), 
-                                  str_pad(total_pop@geography$county, 3, "left", pad="0")),
-                           total_pop@estimate[,"Total Population:  Total "], 
-                           stringsAsFactors = FALSE)
-
-total_pop_df <- select(total_pop_df, 1:2)
-rownames(total_pop_df)<-1:nrow(total_pop_df)
-names(total_pop_df)<-c("GEOID", "Total.Population")
 
 
-
-
-
-
-
-
-
-
-## 
-## 4) Do the merge (tigris)
-## 
-total_pop_merged<- geo_join(counties_shapes, total_pop_df, "GEOID", "GEOID")
-# there are some tracts with no land that we should exclude
-total_pop_merged <- total_pop_merged[total_pop_merged$ALAND>0,]
-
-## 
-## 5) Make your map (leaflet)
-##
-popup <- paste0("County: ", total_pop_merged$NAME, "<br>", "Population: ", total_pop_merged$Total.Population)
-pal <- colorNumeric(
-    palette = "YlGnBu",
-    domain = total_pop_merged$Total.Population
-)
-
-map1<-leaflet() %>%
-    addProviderTiles("CartoDB.Positron") %>%
-    addPolygons(data = total_pop_merged, 
-                fillColor = ~pal(Total.Population), 
-                color = "#b2aeae", # you need to use hex colors
-                fillOpacity = 0.7, 
-                weight = 1, 
-                smoothFactor = 0.2,
-                popup = popup) %>%
-    addLegend(pal = pal, 
-              values = total_pop_merged$Total.Population, 
-              position = "bottomright", 
-              title = "Total Population",
-              labFormat = labelFormat(big.mark = ",")) 
-map1
-#####################################################
-
-# get B14001: School Enrollment by Level of School
-tl = acs.lookup(table.name = "B14001")
-cbind(tl@results$variable.code, 
-      tl@results$variable.name)
-
-col_names = make.names( c("Total", 
+# Query B14001: School Enrollment by Level of School
+# --------------------------------------------------
+#tl = acs.lookup(table.name = "B14001")
+#cbind(tl@results$variable.code, 
+#      tl@results$variable.name)
+    # [1,] "B14001_001" " Total: "                                                      
+    # [2,] "B14001_002" " Enrolled in school: "                                         
+    # [3,] "B14001_003" " Enrolled in school: Enrolled in nursery school, preschool "   
+    # [4,] "B14001_004" " Enrolled in school: Enrolled in kindergarten "                
+    # [5,] "B14001_005" " Enrolled in school: Enrolled in grade 1 to grade 4 "          
+    # [6,] "B14001_006" " Enrolled in school: Enrolled in grade 5 to grade 8 "          
+    # [7,] "B14001_007" " Enrolled in school: Enrolled in grade 9 to grade 12 "         
+    # [8,] "B14001_008" " Enrolled in school: Enrolled in college, undergraduate years "
+    # [9,] "B14001_009" " Enrolled in school: Graduate or professional school "         
+    # [10,] "B14001_010" " Not enrolled in school " 
+col_names = make.names( c("Total.for.Enrollment", 
                           "All.Enrolled", 
                           "Pre.K", 
                           "K", 
@@ -101,52 +71,91 @@ enrl_level <- acs.fetch(geo=NeKsIaMo_counties,
                         table.number="B14001", col.names = col_names, 
                         endyear = 2013, span = 5, dataset = 'acs')
 
+
+##################################################
+##                                              ## 
+## 4) Merge the data frames with geo            ##
+##                                              ##
+##################################################
+
 # convert to a data.frame for merging
-enrl_level_df <- data.frame(paste0(str_pad(enrl_level@geography$state, 2, "left", pad="0"), 
-                                   str_pad(enrl_level@geography$county, 3, "left", pad="0")), # GEOID
-                            # str_pad(enrl_level@geography$state, 2, "left", pad="0"), # State FIPS
-                            # str_pad(enrl_level@geography$county, 3, "left", pad="0"), # County FIPS
-                            enrl_level@geography$NAME, # County, State
-                            enrl_level@estimate[,c("Total",
-                                                   "High.School",
-                                                   "Undergraduate",
-                                                   "Grad.Professional")], 
-                            stringsAsFactors = FALSE)
+acs_df <- data.frame(paste0(str_pad(total_pop@geography$state, 2, "left", pad="0"), 
+                            str_pad(total_pop@geography$county, 3, "left", pad="0")),
+                     enrl_level@geography$NAME, # County, State
+                     total_pop@estimate[,"Total.Population"], 
+                     enrl_level@estimate[,c("Total.for.Enrollment",
+                                            "High.School",
+                                            "Undergraduate",
+                                            "Grad.Professional")], 
+                     stringsAsFactors = FALSE)
 
-#enrl_level_df <- select(enrl_level_df, 1:2)
-rownames(enrl_level_df) <- 1:nrow(enrl_level_df)
-names(enrl_level_df) <- c("GEOID",
-                          "Geo.Name",
-                          "Total",
-                          "High.School",
-                          "Undergraduate",
-                          "Grad.Professional")
+#acs_df <- select(acs_df, 1:2)
+rownames(acs_df) <- 1:nrow(acs_df)
+names(acs_df) <- c("GEOID", 
+                   "Geo.Name",
+                   "Total.Population",
+                   "Total.for.Enrollment",
+                   "High.School",
+                   "Undergraduate",
+                   "Grad.Professional")
 
-enrl_level_df$High.School.percent <- 100 * (enrl_level_df$High.School / enrl_level_df$Total) 
-enrl_level_df$Undergraduate.percent <- 100 * (enrl_level_df$Undergraduate / enrl_level_df$Total) 
-enrl_level_df$Grad.Professional.percent <- 100 * (enrl_level_df$Grad.Professional / enrl_level_df$Total) 
+acs_df$High.School.percent <- 100 * (acs_df$High.School / acs_df$Total.for.Enrollment) 
+acs_df$Undergraduate.percent <- 100 * (acs_df$Undergraduate / acs_df$Total.for.Enrollment) 
+acs_df$Grad.Professional.percent <- 100 * (acs_df$Grad.Professional / acs_df$Total.for.Enrollment)
 
-## 
-## 4) Do the merge (tigris)
-## 
-enrl_level_merged<- geo_join(counties_shapes, enrl_level_df, "GEOID", "GEOID")
-# there are some tracts with no land that we should exclude
-enrl_level_merged <- enrl_level_merged[enrl_level_merged$ALAND>0,]
+##  Merge the shapes (tigris)
+##  (will create a 'Large SpatialPolygonsDataFrame)
+acs_merged <- geo_join(counties_shapes, acs_df, "GEOID", "GEOID")
+acs_merged <- acs_merged[acs_merged$ALAND>0,] # there are some tracts with no land to exclude
 
-## 
-## 5) Make your map (leaflet)
-##
-popup <- paste0(enrl_level_merged$Geo.Name, "<br>", 
-                "UG: <b>", round(enrl_level_merged$Undergraduate.percent,1), "%</b> (", enrl_level_merged$Undergraduate, ") <br>", 
-                "Population, 3+ Years: ", enrl_level_merged$Total)
+##################################################
+##                                              ## 
+## 5) Build maps with (leaflet)                 ##
+##                                              ##
+##################################################
+## TODO: How to add these as map layers?
+
+# map1: Total population by county
+
+popup <- paste0(acs_merged$Geo.Name, "<br>", 
+                "Total Population: ", acs_merged$Total.Population)
+
 pal <- colorNumeric(
     palette = "YlGnBu",
-    domain = enrl_level_merged$Undergraduate.percent
+    domain = acs_merged$Total.Population
 )
 
-map2<-leaflet() %>%
+map1 <- leaflet() %>%
     addProviderTiles("CartoDB.Positron") %>%
-    addPolygons(data = enrl_level_merged, 
+    addPolygons(data = acs_merged, 
+                fillColor = ~pal(Total.Population), 
+                color = "#b2aeae", # you need to use hex colors
+                fillOpacity = 0.7, 
+                weight = 1, 
+                smoothFactor = 0.2,
+                popup = popup) %>%
+    addLegend(pal = pal, 
+              values = acs_merged$Total.Population, 
+              position = "bottomright", 
+              title = "Total Population",
+              labFormat = labelFormat(big.mark = ","))
+map1
+
+
+# map2: Counties by Undergraduate students as percentage of population (3+ years old)
+
+popup <- paste0(acs_merged$Geo.Name, "<br>", 
+                "UG: <b>", round(acs_merged$Undergraduate.percent,1), "%</b> (", acs_merged$Undergraduate, ") <br>", 
+                "Population, 3+ Years: ", acs_merged$Total.for.Enrollment)
+
+pal <- colorNumeric(
+    palette = "YlGnBu",
+    domain = acs_merged$Undergraduate.percent
+)
+
+map2 <- leaflet() %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    addPolygons(data = acs_merged, 
                 fillColor = ~pal(Undergraduate.percent), 
                 color = "#b2aeae", # you need to use hex colors
                 fillOpacity = 0.7, 
@@ -154,26 +163,28 @@ map2<-leaflet() %>%
                 smoothFactor = 0.2,
                 popup = popup) %>%
     addLegend(pal = pal, 
-              values = enrl_level_merged$Undergraduate.percent, 
+              values = acs_merged$Undergraduate.percent, 
               position = "bottomright", 
               title = "%Undergraduates",
               labFormat = labelFormat(suffix = "%"))
 map2
 
-### Now color map by Count of Undergraduates
-popup <- paste0(enrl_level_merged$Geo.Name, "<br>", 
+# map 3: Counties by count of Undergraduate students 
+
+popup <- paste0(acs_merged$Geo.Name, "<br>", 
                 "UG: <b>", 
-                enrl_level_merged$Undergraduate, "</b> (", 
-                round(enrl_level_merged$Undergraduate.percent,1), "%)<br>",
-                "Population, 3+ Years: ", enrl_level_merged$Total)
+                acs_merged$Undergraduate, "</b> (", 
+                round(acs_merged$Undergraduate.percent,1), "%)<br>", 
+                "Population, 3+ Years: ", acs_merged$Total.for.Enrollment)
+
 pal <- colorNumeric(
     palette = "YlGnBu",
-    domain = enrl_level_merged$Undergraduate
+    domain = acs_merged$Undergraduate
 )
 
-map3<-leaflet() %>%
+map3 <-  leaflet() %>%
     addProviderTiles("CartoDB.Positron") %>%
-    addPolygons(data = enrl_level_merged, 
+    addPolygons(data = acs_merged, 
                 fillColor = ~pal(Undergraduate), 
                 color = "#b2aeae", # you need to use hex colors
                 fillOpacity = 0.7, 
@@ -181,11 +192,12 @@ map3<-leaflet() %>%
                 smoothFactor = 0.2,
                 popup = popup) %>%
     addLegend(pal = pal, 
-              values = enrl_level_merged$Undergraduate, 
+              values = acs_merged$Undergraduate, 
               position = "bottomright", 
               title = "Undergraduates",
-              labFormat = labelFormat(suffix = "%"))
+              labFormat = labelFormat(big.mark = ","))
 map3
+
 #####################################################
 
 # write out the data file
