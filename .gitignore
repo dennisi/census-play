@@ -5,6 +5,15 @@ __pycache__/
 # C extensions
 *.so
 
+# DAI Census work files:
+maps/
+shapefiles/
+
+.RData
+.RHistory
+*.Rproj
+.Rproj.user/
+
 # Distribution / packaging
 .Python
 env/
@@ -99,3 +108,4 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+.Rproj.user
