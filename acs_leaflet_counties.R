@@ -15,12 +15,12 @@ library(dplyr)    # for working with data frames
 ## 2) Get the spatial data (tigris)
 ##
 counties_shapes <- counties(state=c('NE','KS','IA','MO'), cb=TRUE)
+## make geo of all the counties in the four states (for acs query)
+NeKsIaMo_counties <- geo.make(state=c('NE','KS','IA','MO'), county = '*', check = TRUE)
 
 ##
 ## 3) Get the tabular data (acs) 
 ##     
-## make geo of all the counties in the four states
-NeKsIaMo_counties <- geo.make(state=c('NE','KS','IA','MO'), county = '*', check = TRUE)
 # make geo of the 15 counties in the Service Area
 
 # get total population:
@@ -37,11 +37,15 @@ total_pop_df <- data.frame(paste0(str_pad(total_pop@geography$state, 2, "left", 
 
 total_pop_df <- select(total_pop_df, 1:2)
 rownames(total_pop_df)<-1:nrow(total_pop_df)
-names(total_pop_df)<-c("GEOID", "total")
-total_pop_df$percent <- 100 #*(total_pop_df$over_200/total_pop_df$total) # WRONG
-    # more appropriate division (proportion) calculation:
-    #apply(enrl_level_p[,7:8], MARGIN = 1, FUN = divide.acs, 
-    #      denominator = enrl_level_p[,1], method = "proportion", verbose=F)
+names(total_pop_df)<-c("GEOID", "Total.Population")
+
+
+
+
+
+
+
+
 
 
 ## 
@@ -54,23 +58,23 @@ total_pop_merged <- total_pop_merged[total_pop_merged$ALAND>0,]
 ## 
 ## 5) Make your map (leaflet)
 ##
-popup <- paste0("County: ", total_pop_merged$NAME, "<br>", "Population: ", total_pop_merged$total)
+popup <- paste0("County: ", total_pop_merged$NAME, "<br>", "Population: ", total_pop_merged$Total.Population)
 pal <- colorNumeric(
     palette = "YlGnBu",
-    domain = total_pop_merged$total
+    domain = total_pop_merged$Total.Population
 )
 
 map1<-leaflet() %>%
     addProviderTiles("CartoDB.Positron") %>%
     addPolygons(data = total_pop_merged, 
-                fillColor = ~pal(total), 
+                fillColor = ~pal(Total.Population), 
                 color = "#b2aeae", # you need to use hex colors
                 fillOpacity = 0.7, 
                 weight = 1, 
                 smoothFactor = 0.2,
                 popup = popup) %>%
     addLegend(pal = pal, 
-              values = total_pop_merged$total, 
+              values = total_pop_merged$Total.Population, 
               position = "bottomright", 
               title = "Total Population",
               labFormat = labelFormat(big.mark = ",")) 
@@ -184,10 +188,114 @@ map3<-leaflet() %>%
 map3
 #####################################################
 
+# write out the data file
+#write.csv(enrl_level_df, file="./enrollment_by_level.csv")
+
+
+
+# B02001: Race
+tl <- acs.lookup(table.name = "B02001") # or table.number?
+cbind(tl@results$variable.code, 
+      tl@results$variable.name)
+    # [1,] "B02001_001" " Total: "                                                                         
+    # [2,] "B02001_002" " White alone "                                                                    
+    # [3,] "B02001_003" " Black or African American alone "                                                
+    # [4,] "B02001_004" " American Indian and Alaska Native alone "                                        
+    # [5,] "B02001_005" " Asian alone "                                                                    
+    # [6,] "B02001_006" " Native Hawaiian and Other Pacific Islander alone "                               
+    # [7,] "B02001_007" " Some other race alone "                                                          
+    # [8,] "B02001_008" " Two or more races: "                                                             
+    # [9,] "B02001_009" " Two or more races: Two races including Some other race "                         
+    # [10,] "B02001_010" " Two or more races: Two races excluding Some other race, and three or more races "
+
+# B03003: Hispanic or Latino Origin
+tl <- acs.lookup(table.name = "B03003") # or table.number?
+cbind(tl@results$variable.code, 
+      tl@results$variable.name)
+    # [1,] "B03003_001" " Total: "                
+    # [2,] "B03003_002" " Not Hispanic or Latino "
+    # [3,] "B03003_003" " Hispanic or Latino "  
+
+
+# Get B15002: "Sex by Educational Attainment for the Population 25 Years and over"
+tl <- acs.lookup(table.name = "B15002") # or table.number?
+cbind(tl@results$variable.code, 
+      tl@results$variable.name)
+    #     [1,] "B15002_001" " Total: "                                           
+    #     [2,] "B15002_002" " Male: "                                            
+    #     [3,] "B15002_003" " Male: No schooling completed "                     
+    #     [4,] "B15002_004" " Male: Nursery to 4th grade "                       
+    #     [5,] "B15002_005" " Male: 5th and 6th grade "                          
+    #     [6,] "B15002_006" " Male: 7th and 8th grade "                          
+    #     [7,] "B15002_007" " Male: 9th grade "                                  
+    #     [8,] "B15002_008" " Male: 10th grade "                                 
+    #     [9,] "B15002_009" " Male: 11th grade "                                 
+    #     [10,] "B15002_010" " Male: 12th grade, no diploma "                     
+    #     [11,] "B15002_011" " Male: High school graduate, GED, or alternative "  
+    #     [12,] "B15002_012" " Male: Some college, less than 1 year "             
+    #     [13,] "B15002_013" " Male: Some college, 1 or more years, no degree "   
+    #     [14,] "B15002_014" " Male: Associate's degree "                         
+    #     [15,] "B15002_015" " Male: Bachelor's degree "                          
+    #     [16,] "B15002_016" " Male: Master's degree "                            
+    #     [17,] "B15002_017" " Male: Professional school degree "                 
+    #     [18,] "B15002_018" " Male: Doctorate degree "                           
+    #     [19,] "B15002_019" " Female: "                                          
+    #     [20,] "B15002_020" " Female: No schooling completed "                   
+    #     [21,] "B15002_021" " Female: Nursery to 4th grade "                     
+    #     [22,] "B15002_022" " Female: 5th and 6th grade "                        
+    #     [23,] "B15002_023" " Female: 7th and 8th grade "                        
+    #     [24,] "B15002_024" " Female: 9th grade "                                
+    #     [25,] "B15002_025" " Female: 10th grade "                               
+    #     [26,] "B15002_026" " Female: 11th grade "                               
+    #     [27,] "B15002_027" " Female: 12th grade, no diploma "                   
+    #     [28,] "B15002_028" " Female: High school graduate, GED, or alternative "
+    #     [29,] "B15002_029" " Female: Some college, less than 1 year "           
+    #     [30,] "B15002_030" " Female: Some college, 1 or more years, no degree " 
+    #     [31,] "B15002_031" " Female: Associate's degree "                       
+    #     [32,] "B15002_032" " Female: Bachelor's degree "                        
+    #     [33,] "B15002_033" " Female: Master's degree "                          
+    #     [34,] "B15002_034" " Female: Professional school degree "               
+    #     [35,] "B15002_035" " Female: Doctorate degree "        
+
+
+# B19049: Median Household Income by Age of Householder
+tl <- acs.lookup(table.name = "B19049") # or table.number?
+cbind(tl@results$variable.code, 
+      tl@results$variable.name)
+# [1,] "B19049_000.5" " Median household income in the past 12 months (in 2011 inflation-adjusted dollars) -- "                              
+# [2,] "B19049_001"   " Median household income in the past 12 months (in 2010 inflation-adjusted dollars) -- Total: "                       
+# [3,] "B19049_002"   " Median household income in the past 12 months (in 2010 inflation-adjusted dollars) -- Householder under 25 years "   
+# [4,] "B19049_003"   " Median household income in the past 12 months (in 2010 inflation-adjusted dollars) -- Householder 25 to 44 years "   
+# [5,] "B19049_004"   " Median household income in the past 12 months (in 2011 inflation-adjusted dollars) -- Householder 45 to 64 years "   
+# [6,] "B19049_005"   " Median household income in the past 12 months (in 2011 inflation-adjusted dollars) -- Householder 65 years and over "
+
+
+# B20004: "Median Earnings by Sex by Educational Attainment for the Population 25 Years and Over"
+tl <- acs.lookup(table.name = "B20004") # or table.number?
+cbind(tl@results$variable.code, 
+      tl@results$variable.name)
+    #     [1,] "B20004_001" " Total: "                                                    
+    #     [2,] "B20004_002" " Total: Less than high school graduate "                     
+    #     [3,] "B20004_003" " Total: High school graduate (includes equivalency) "        
+    #     [4,] "B20004_004" " Total: Some college or associate's degree "                 
+    #     [5,] "B20004_005" " Total: Bachelor's degree "                                  
+    #     [6,] "B20004_006" " Total: Graduate or professional degree "                    
+    #     [7,] "B20004_007" " Total: Male: "                                              
+    #     [8,] "B20004_008" " Total: Male: Less than high school graduate "               
+    #     [9,] "B20004_009" " Total: Male: High school graduate (includes equivalency) "  
+    #     [10,] "B20004_010" " Total: Male: Some college or associate's degree "           
+    #     [11,] "B20004_011" " Total: Male: Bachelor's degree "                            
+    #     [12,] "B20004_012" " Total: Male: Graduate or professional degree "              
+    #     [13,] "B20004_013" " Total: Female: "                                            
+    #     [14,] "B20004_014" " Total: Female: Less than high school graduate "             
+    #     [15,] "B20004_015" " Total: Female: High school graduate (includes equivalency) "
+    #     [16,] "B20004_016" " Total: Female: Some college or associate's degree "         
+    #     [17,] "B20004_017" " Total: Female: Bachelor's degree "                          
+    #     [18,] "B20004_018" " Total: Female: Graduate or professional degree "    
 
 
 # get C14002: School Enrollment by Level of School by Type of School
-
+# B14005: Sex By School Enrollment By Educational Attainment By Employment Status For The Population 16 To 19 Years
 ## Saving your maps
 library(htmlwidgets)
 saveWidget(map1, file="maps/map1-population.html", selfcontained=FALSE)
