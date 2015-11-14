@@ -40,8 +40,7 @@ total_pop <- acs.fetch(geo=NeKsIaMo_counties,
                        table.number="B01003", col.names = "Total.Population", 
                        endyear = 2013, span = 5, dataset = 'acs')
 
-
-# Query B14001: School Enrollment by Level of School
+# Query B14001: "School Enrollment by Level of School"
 # --------------------------------------------------
 #tl = acs.lookup(table.name = "B14001")
 #cbind(tl@results$variable.code, 
@@ -71,6 +70,50 @@ enrl_level <- acs.fetch(geo=NeKsIaMo_counties,
                         table.number="B14001", col.names = col_names, 
                         endyear = 2013, span = 5, dataset = 'acs')
 
+# Query B02001: "Race"
+# --------------------------------------------------
+# tl <- acs.lookup(table.name = "B02001") # or table.number?
+# cbind(tl@results$variable.code, 
+#       tl@results$variable.name)
+    # [1,] "B02001_001" " Total: "                                                                         
+    # [2,] "B02001_002" " White alone "                                                                    
+    # [3,] "B02001_003" " Black or African American alone "                                                
+    # [4,] "B02001_004" " American Indian and Alaska Native alone "                                        
+    # [5,] "B02001_005" " Asian alone "                                                                    
+    # [6,] "B02001_006" " Native Hawaiian and Other Pacific Islander alone "                               
+    # [7,] "B02001_007" " Some other race alone "                                                          
+    # [8,] "B02001_008" " Two or more races: "                                                             
+    # [9,] "B02001_009" " Two or more races: Two races including Some other race "                         
+    # [10,] "B02001_010" " Two or more races: Two races excluding Some other race, and three or more races "
+col_names = make.names( c("Race.Total.check", 
+                          "White", 
+                          "Black", 
+                          "AmIndian", 
+                          "Asian", 
+                          "Hawaiian", 
+                          "Race.Other", 
+                          "Race.Multiple", 
+                          "Race.Multiple2", 
+                          "Race.Multiple3"))
+race_data <- acs.fetch(geo=NeKsIaMo_counties, 
+                       table.number="B02001", col.names = col_names, 
+                       endyear = 2013, span = 5, dataset = 'acs')
+
+# Query B03003: "Hispanic or Latino Origin"
+# --------------------------------------------------
+# tl <- acs.lookup(table.name = "B03003") # or table.number?
+# cbind(tl@results$variable.code, 
+#       tl@results$variable.name)
+    # [1,] "B03003_001" " Total: "                
+    # [2,] "B03003_002" " Not Hispanic or Latino "
+    # [3,] "B03003_003" " Hispanic or Latino " 
+col_names = make.names( c("Hispanic.Total.delete", 
+                          "Non.Hispanic", 
+                          "Hispanic"))
+hispanic_data <- acs.fetch(geo=NeKsIaMo_counties, 
+                       table.number="B03003", col.names = col_names, 
+                       endyear = 2013, span = 5, dataset = 'acs')
+
 
 ##################################################
 ##                                              ## 
@@ -82,29 +125,35 @@ enrl_level <- acs.fetch(geo=NeKsIaMo_counties,
 acs_df <- data.frame(paste0(str_pad(total_pop@geography$state, 2, "left", pad="0"), 
                             str_pad(total_pop@geography$county, 3, "left", pad="0")),
                      enrl_level@geography$NAME, # County, State
-                     total_pop@estimate[,"Total.Population"], 
-                     enrl_level@estimate[,c("Total.for.Enrollment",
+                     total_pop@estimate[, "Total.Population"], 
+                     enrl_level@estimate[, c("Total.for.Enrollment",
                                             "High.School",
                                             "Undergraduate",
                                             "Grad.Professional")], 
+                     race_data@estimate[, c("Race.Total.check", 
+                                           "White", 
+                                           "Black", 
+                                           "AmIndian", 
+                                           "Asian", 
+                                           "Hawaiian", 
+                                           "Race.Other", 
+                                           "Race.Multiple")],
+                     hispanic_data@estimate[, c("Non.Hispanic", 
+                                                "Hispanic")],
                      stringsAsFactors = FALSE)
 
 #acs_df <- select(acs_df, 1:2)
-rownames(acs_df) <- 1:nrow(acs_df)
-names(acs_df) <- c("GEOID", 
+#rownames(acs_df) <- 1:nrow(acs_df)
+names(acs_df)[1:3] <- c("GEOID", 
                    "Geo.Name",
-                   "Total.Population",
-                   "Total.for.Enrollment",
-                   "High.School",
-                   "Undergraduate",
-                   "Grad.Professional")
+                   "Total.Population")
 
 acs_df$High.School.percent <- 100 * (acs_df$High.School / acs_df$Total.for.Enrollment) 
 acs_df$Undergraduate.percent <- 100 * (acs_df$Undergraduate / acs_df$Total.for.Enrollment) 
 acs_df$Grad.Professional.percent <- 100 * (acs_df$Grad.Professional / acs_df$Total.for.Enrollment)
 
 ##  Merge the shapes (tigris)
-##  (will create a 'Large SpatialPolygonsDataFrame)
+##    (will create a 'Large SpatialPolygonsDataFrame)
 acs_merged <- geo_join(counties_shapes, acs_df, "GEOID", "GEOID")
 acs_merged <- acs_merged[acs_merged$ALAND>0,] # there are some tracts with no land to exclude
 
@@ -204,29 +253,7 @@ map3
 #write.csv(enrl_level_df, file="./enrollment_by_level.csv")
 
 
-
-# B02001: Race
-tl <- acs.lookup(table.name = "B02001") # or table.number?
-cbind(tl@results$variable.code, 
-      tl@results$variable.name)
-    # [1,] "B02001_001" " Total: "                                                                         
-    # [2,] "B02001_002" " White alone "                                                                    
-    # [3,] "B02001_003" " Black or African American alone "                                                
-    # [4,] "B02001_004" " American Indian and Alaska Native alone "                                        
-    # [5,] "B02001_005" " Asian alone "                                                                    
-    # [6,] "B02001_006" " Native Hawaiian and Other Pacific Islander alone "                               
-    # [7,] "B02001_007" " Some other race alone "                                                          
-    # [8,] "B02001_008" " Two or more races: "                                                             
-    # [9,] "B02001_009" " Two or more races: Two races including Some other race "                         
-    # [10,] "B02001_010" " Two or more races: Two races excluding Some other race, and three or more races "
-
-# B03003: Hispanic or Latino Origin
-tl <- acs.lookup(table.name = "B03003") # or table.number?
-cbind(tl@results$variable.code, 
-      tl@results$variable.name)
-    # [1,] "B03003_001" " Total: "                
-    # [2,] "B03003_002" " Not Hispanic or Latino "
-    # [3,] "B03003_003" " Hispanic or Latino "  
+ 
 
 
 # Get B15002: "Sex by Educational Attainment for the Population 25 Years and over"
