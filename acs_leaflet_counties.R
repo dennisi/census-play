@@ -249,12 +249,22 @@ map3
 
 #####################################################
 
-# write out the data file
-#write.csv(enrl_level_df, file="./enrollment_by_level.csv")
+# TODO NEXT:
+# 1. write out the data file
+write.csv(acs_merged, file="./acs_counties.csv")
+# 2. play with it in Tableau
+# 3. linear regression?
+
+require(corrplot)
+
+# head(acs_df[, c(6, 19, 5, 18, 7, 20, 3, 4, 8:17)])
+acs.corr <- cor(acs_df[, c(6, 19, 5, 18, 7, 20, 3, 4, 8:17)])
+corrplot(acs.corr, method="ellipse")
 
 
- 
-
+# head(acs_df[, c(19, 18, 20, 3, 4, 8:17)])
+acs.corr <- cor(acs_df[, c(19, 18, 20, 3, 4, 8:17)])
+corrplot(acs.corr, method="ellipse")
 
 # Get B15002: "Sex by Educational Attainment for the Population 25 Years and over"
 tl <- acs.lookup(table.name = "B15002") # or table.number?

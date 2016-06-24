@@ -61,6 +61,61 @@ total_pop_merged<- geo_join(tracts_shapes, total_pop_df, "GEOID", "GEOID")
 # there are some tracts with no land that we should exclude
 total_pop_merged <- total_pop_merged[total_pop_merged$ALAND>0,]
 
+
+# Make KDE Weighted Plots
+kde.w.plot.dai(total_pop_merged, "total", palname = "Greens")
+# plot(total_pop_merged, border=alpha("lightgray", 0.1), add = TRUE) 
+
+acs_ne_tracts <- total_pop_merged[total_pop_merged$STATEFP == '31',]
+acs_ne_tracts@data['total.log'] <- log(acs_ne_tracts[["total"]])
+kde.w.plot.dai(acs_ne_tracts, "total", palname = "Greens")
+kde.w.plot.dai(acs_ne_tracts, "total", palname = "Greens", hscale = 0.5, mtitle = "h.scale=0.5")
+kde.w.plot.dai(acs_ne_tracts, "total", palname = "Greens", hscale = 0.2, mtitle = "h.scale=0.2")
+kde.w.plot.dai(acs_ne_tracts, "total.log", palname = "Greens")
+kde.w.plot.dai(acs_ne_tracts, "total.log", palname = "Greens", hscale = 0.5, mtitle = "h.scale=0.5")
+kde.w.plot.dai(acs_ne_tracts, "total.log", palname = "Greens", hscale = 0.2, mtitle = "h.scale=0.2")
+
+# acs_ne_tracts@data['Undergraduate.log'] <- log(acs_ne_tracts[["Undergraduate"]])
+# kde.w.plot.dai(acs_ne_tracts, "Undergraduate", palname = "Blues")
+
+# exclude Douglas County (contains Omaha) COUNTYFP = 055, GEOID=31055
+acs_ne_tracts_nomaha <- acs_ne_tracts[ acs_ne_tracts$COUNTYFP != '055', ]
+kde.w.plot.dai(acs_ne_tracts_nomaha, "total", palname = "Greens")
+kde.w.plot.dai(acs_ne_tracts_nomaha, "total", palname = "Greens", hscale = 0.5, mtitle = "h.scale=0.5")
+kde.w.plot.dai(acs_ne_tracts_nomaha, "total", palname = "Greens", hscale = 0.2, mtitle = "h.scale=0.2")
+kde.w.plot.dai(acs_ne_tracts_nomaha, "total.log", palname = "Greens")
+kde.w.plot.dai(acs_ne_tracts_nomaha, "total.log", palname = "Greens", hscale = 0.5, mtitle = "h.scale=0.5")
+kde.w.plot.dai(acs_ne_tracts_nomaha, "total.log", palname = "Greens", hscale = 0.2, mtitle = "h.scale=0.2")
+
+acs_ssc_tracts <- acs_ne_tracts[ acs_ne_tracts$COUNTYFP %in% scc_FPs, ]
+kde.w.plot.dai(acs_ssc_tracts, "total", palname = "Greens")
+kde.w.plot.dai(acs_ssc_tracts, "total", palname = "Greens", hscale = 0.5, mtitle = "h.scale=0.5")
+kde.w.plot.dai(acs_ssc_tracts, "total", palname = "Greens", hscale = 0.3, mtitle = "h.scale=0.3")
+kde.w.plot.dai(acs_ssc_tracts, "total.log", palname = "Greens")
+kde.w.plot.dai(acs_ssc_tracts, "total.log", palname = "Greens", hscale = 0.5, mtitle = "h.scale=0.5")
+kde.w.plot.dai(acs_ssc_tracts, "total.log", palname = "Greens", hscale = 0.2, mtitle = "h.scale=0.2")
+
+choropleth(acs_ssc_tracts, v = acs_ssc_tracts$total)
+choro.legend()
+
+# choropleth(blocks, n.breach / blocks$AREA )
+choropleth(acs_merged, acs_merged$Hawaiian)
+
+acs_w_metric = "total"
+palname = "Greens"
+# hscale = 0.3
+acs_dens_w <- kde.points.weighted(acs_ssc_tracts, 
+                                  #acs_ug_ne@data$Undergraduate, # Weights
+                                  w = acs_ssc_tracts@data[[acs_w_metric]] #acs_data@data$High.School
+                                  ,# / (acs_data@data$ALAND + acs_data@data$AWATER), # per sq.mile
+                                  # / sum(acs_data@data$Total.Population),           # per capita
+                                  hscale = 0.65,
+                                  n = 200)
+acs_dens_shades <- auto.shading(acs_dens_w$kde, n=9, cols = alpha(brewer.pal(9, palname),0.7), cutter = rangeCuts)
+level.plot(acs_dens_w, shades = acs_dens_shades, add=TRUE)
+
+alpha(brewer.pal(9, palname),0.7)
+brewer.pal(9, palname)
 ## 
 ## 5) Make your map (leaflet)
 ##
@@ -205,13 +260,38 @@ map3<-leaflet() %>%
 map3
 #####################################################
 
+
+popup <- paste0(acs_ssc_tracts$Geo.Name, "<br>", 
+                "Population, 3+ Years: ", acs_ssc_tracts$total)
+pal <- colorNumeric(
+    palette = "YlGnBu",
+    domain = acs_ssc_tracts$total
+)
+
+map4<-leaflet() %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    addPolygons(data = acs_ssc_tracts, 
+                fillColor = ~pal(total), 
+                color = "#b2aeae", # you need to use hex colors
+                fillOpacity = 0.7, 
+                weight = 1, 
+                smoothFactor = 0.2,
+                popup = popup) %>%
+    addLegend(pal = pal, 
+              values = acs_ssc_tracts$total, 
+              position = "bottomright", 
+              title = "Population",
+              labFormat = labelFormat(big.mark = ","))
+map4
+
 # write out the data file
 #write.csv(enrl_level_df, file="./enrollment_by_level.csv")
 
 # get C14002: School Enrollment by Level of School by Type of School
 
 ## Saving your maps
-# library(htmlwidgets)
+library(htmlwidgets)
 # saveWidget(map1, file="maps/map1-population.html", selfcontained=FALSE)
 # saveWidget(map2, file="maps/map2-undergraduate-pct.html", selfcontained=FALSE)
 # saveWidget(map3, file="maps/map3-undergraduate-count.html", selfcontained=FALSE)
+saveWidget(map4, file="maps/map4-pop-by-tract.html", selfcontained=FALSE)
